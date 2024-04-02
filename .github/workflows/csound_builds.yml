@@ -15,65 +15,38 @@ on:
   workflow_dispatch:
 
 jobs:
-  windows_build:
-    name: Windows build
-    runs-on: windows-2019
+  windows_build_mingw:
+    name: Windows build (mingw/vcpkg)
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout Source Code
+      - name: Checkout source code
         uses: actions/checkout@v1
         with:
           fetch-depth: 1
           submodules: true
-      - name: Install system dependencies
-        run: |
-          choco install -y winflexbison
+
+      - name: Export GitHub Actions cache environment variables
+        uses: actions/github-script@v6
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
       - name: Bootstrap VCPKG
-        run: .\vcpkg\bootstrap-vcpkg.bat
-      - name: Setup NuGet Credentials
-        shell: bash
-        run: >
-          `./vcpkg/vcpkg fetch nuget | tail -n 1`
-          sources add
-          -source "https://nuget.pkg.github.com/csound/index.json"
-          -storepasswordincleartext
-          -name "GitHub"
-          -username "csound"
-          -password "${{ secrets.GITHUB_TOKEN }}"
-      - name: Configure build
-        run: cmake -B build -S . -DUSE_VCPKG=1 -DCUSTOM_CMAKE="./platform/windows/Custom-vs.cmake"
+        run: ./vcpkg/bootstrap-vcpkg.sh
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install mingw-w64-x86-64-dev gcc-mingw-w64 g++-mingw-w64 mingw-w64-tools wine
+
+      - name: Use posix mingw
+        run: |
+          sudo update-alternatives --set x86_64-w64-mingw32-gcc /usr/bin/x86_64-w64-mingw32-gcc-posix
+          sudo update-alternatives --set x86_64-w64-mingw32-g++ /usr/bin/x86_64-w64-mingw32-g++-posix
+
+      - name: Configure Build
+        run: cmake -B build -S . -DUSE_VCPKG=1 -DCUSTOM_CMAKE="./platform/mingw64-linux/Custom.cmake" -DCMAKE_SYSTEM_NAME=MinGW
+
       - name: Build Csound
         run: cmake --build build --config Release
-      - name: Run tests
-        run: cmake --build build --target csdtests
-      - name: Acquire Csound manual
-        shell: powershell
-        run: |
-          Invoke-WebRequest -Uri "https://github.com/csound/manual/releases/download/6.18.0/Csound6.18.0_manual_html.zip" -OutFile "./manual.zip"
-          7z x manual.zip
-      - name: Build installer
-        shell: powershell
-        run: |
-          $Env:RedistVersion=Get-Content "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\Microsoft.VCRedistVersion.default.txt"
-          $Env:VCREDIST_CRT_DIR="C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Redist\MSVC\${Env:RedistVersion}\x64\Microsoft.VC142.CRT"
-          $Env:VCREDIST_CXXAMP_DIR="C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Redist\MSVC\${Env:RedistVersion}\x64\Microsoft.VC142.CXXAMP"
-          $Env:VCREDIST_OPENMP_DIR="C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Redist\MSVC\${Env:RedistVersion}\x64\Microsoft.VC142.OpenMP"
-          iscc /o. installer\\windows\\csound6_x64_github.iss
-      - name: Upload installer
-        uses: actions/upload-artifact@v2
-        with:
-          name: Csound6_x64-${{env.CSOUND_VERSION}}.${{github.run_number}}-windows-x64-installer
-          path: ./Csound6_x64-windows_x86_64-*.exe
-          if-no-files-found: error
-      - name: Upload zip
-        uses: actions/upload-artifact@v2
-        with:
-          name: csound-${{env.CSOUND_VERSION}}-${{github.run_number}}-windows-x64-binaries
-          path: |
-            ./build/Release/*.exe
-            ./build/Release/*.dll
-            ./build/Release/*.pyd
-            ./build/Release/csound64.lib
-            ./build/*.jar
-            ./build/*.py
-            ./include/
-          if-no-files-found: error
