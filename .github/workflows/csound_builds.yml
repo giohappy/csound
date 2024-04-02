@@ -12,55 +12,9 @@ on:
   pull_request:
     branches:
       - csound6
+  workflow_dispatch:
 
 jobs:
-  linux_build:
-    name: Linux/Ubuntu build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Source Code
-        uses: actions/checkout@v1
-        with:
-          fetch-depth: 1
-      - name: Install Dependencies
-        run: sudo apt-get update && sudo apt-get install cmake libsndfile1-dev libasound2-dev libjack-dev portaudio19-dev libportmidi-dev libpulse-dev swig liblua5.1-0-dev default-jdk libfltk1.1-dev libfluidsynth-dev liblo-dev fluid ladspa-sdk libpng-dev dssi-dev libstk0-dev libgmm++-dev bison flex libportsmf-dev libeigen3-dev libcunit1-dev
-      - name: Configure build
-        run: mkdir build && cd build && cmake .. -DUSE_MP3=0
-      - name: Build Csound
-        run: cd build && make
-      - name: Run tests
-        run: cd build && make test csdtests
-
-  macos_build:
-    name: MacOS build
-    runs-on: macos-latest
-    steps:
-      - name: Checkout Source Code
-        uses: actions/checkout@v1
-        with:
-          fetch-depth: 1
-      - name: Install Dependencies
-        run: brew install cmake swig eigen asio libsndfile portaudio portmidi libsamplerate liblo jack openjdk hdf5 gettext fluid-synth fltk stk wiiuse
-      - name: Configure build
-        run: mkdir build && cd build && cmake ..
-      - name: Build Csound
-        run: cd build && make
-      - name: Run tests
-        run: cd build && make test csdtests
-
-  #android_build:
-  #  name: Android build
-  # runs-on: ubuntu-latest
-  # steps:
-  #    - name: run the Docker image
-  #     run: docker run --name csound_test_run -i sjamble/csound_android
-  #   - name: copying build out of container
-  #    run: docker cp csound_test_run:/csound/Android/csound-android-6.18.0.zip .
-  #  - uses: actions/upload-artifact@v2
-  #    with:
-  #       name: csound-android-6.18.0.zip
-  #      path: .
-
   windows_build:
     name: Windows build
     runs-on: windows-2019
